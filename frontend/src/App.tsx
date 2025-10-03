@@ -15,22 +15,22 @@ function App() {
     try {
       const data = await uploadPDF(file);
       addSystemMessage(
-        `📄 Uploaded "${data.filename}" - ${data.pages} pages, ${data.chunks} chunks.\n💡 RAG mode enabled.`
+        `Successfully uploaded "${data.filename}"\n\nProcessed ${data.pages} pages into ${data.chunks} chunks. RAG mode is now active.`
       );
       setUseRAG(true);
     } catch (err) {
-      addSystemMessage(`❌ Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      addSystemMessage(`Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
   const handleClearDocuments = async () => {
     await clearDocuments();
     setUseRAG(false);
-    addSystemMessage('🗑️ Documents cleared.');
+    addSystemMessage('All documents have been cleared from the system.');
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-gray-900 to-gray-800">
+    <div className="flex flex-col h-screen bg-neutral-900">
       <Header onClearChat={clearChat} />
       
       <RAGControls
