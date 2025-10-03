@@ -1,11 +1,9 @@
 from fastapi import APIRouter, HTTPException
 from models.schemas import ChatRequest, ChatResponse
 from services.chat_service import ChatService
-from services.document_service import DocumentService
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
-# This will be injected
 chat_service: ChatService = None
 
 def set_chat_service(service: ChatService):
@@ -22,12 +20,11 @@ async def chat(request: ChatRequest):
             use_rag=request.use_rag
         )
     except Exception as e:
-        error_msg = str(e)
-        print(f"ERROR in chat: {error_msg}")
+        error_msg = str(e).lower()
         
-        if "authentication" in error_msg.lower():
-            raise HTTPException(status_code=401, detail="Invalid OpenAI API key")
-        elif "rate" in error_msg.lower():
+        if "authentication" in error_msg:
+            raise HTTPException(status_code=401, detail="Invalid API key")
+        if "rate" in error_msg:
             raise HTTPException(status_code=429, detail="Rate limit exceeded")
-        else:
-            raise HTTPException(status_code=500, detail=f"Error: {error_msg}")
+        
+        raise HTTPException(status_code=500, detail=str(e))
