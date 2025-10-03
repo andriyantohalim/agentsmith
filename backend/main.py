@@ -115,18 +115,38 @@ async def upload_pdf(file: UploadFile = File(...)):
         documents = [Document(page_content=chunk, metadata={"source": file.filename}) for chunk in chunks]
         uploaded_documents.extend(documents)
         
-        print("Creating embeddings...")
+        print("Creating embeddings in batches...")
         # Create or update vector store
         embeddings = OpenAIEmbeddings(
             api_key=os.getenv("OPENAI_API_KEY")
         )
         
+        # Process in batches to avoid token limit
+        batch_size = 100  # Process 100 documents at a time
+        total_batches = (len(documents) + batch_size - 1) // batch_size
+        
         if vector_store is None:
-            print("Creating new vector store...")
-            vector_store = FAISS.from_documents(documents, embeddings)
+            print(f"Creating new vector store with {total_batches} batches...")
+            # Create initial vector store with first batch
+            first_batch = documents[:batch_size]
+            vector_store = FAISS.from_documents(first_batch, embeddings)
+            print(f"Batch 1/{total_batches} processed")
+            
+            # Add remaining batches
+            for i in range(batch_size, len(documents), batch_size):
+                batch = documents[i:i + batch_size]
+                batch_num = (i // batch_size) + 1
+                print(f"Processing batch {batch_num}/{total_batches}...")
+                vector_store.add_documents(batch)
+                print(f"Batch {batch_num}/{total_batches} processed")
         else:
-            print("Adding to existing vector store...")
-            vector_store.add_documents(documents)
+            print(f"Adding to existing vector store with {total_batches} batches...")
+            for i in range(0, len(documents), batch_size):
+                batch = documents[i:i + batch_size]
+                batch_num = (i // batch_size) + 1
+                print(f"Processing batch {batch_num}/{total_batches}...")
+                vector_store.add_documents(batch)
+                print(f"Batch {batch_num}/{total_batches} processed")
         
         print("Vector store updated successfully")
         
