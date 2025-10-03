@@ -1,6 +1,6 @@
-# AgentSmith
+# AgentSmith Chatbot
 
-A simple full-stack web application built with React (TypeScript) + Tailwind CSS frontend and FastAPI backend.
+A full-stack AI chatbot application built with React (TypeScript) + Tailwind CSS frontend and FastAPI backend, powered by OpenAI's GPT-3.5-turbo.
 
 ## Project Structure
 
@@ -8,6 +8,8 @@ A simple full-stack web application built with React (TypeScript) + Tailwind CSS
 agentsmith/
 ├── frontend/          # React + TypeScript + Tailwind CSS
 │   ├── src/
+│   │   ├── types/
+│   │   │   └── chat.ts
 │   │   ├── App.tsx
 │   │   ├── main.tsx
 │   │   └── index.css
@@ -16,9 +18,10 @@ agentsmith/
 │   ├── tsconfig.json
 │   ├── vite.config.ts
 │   └── tailwind.config.js
-└── backend/           # FastAPI + Python
+└── backend/           # FastAPI + Python + OpenAI
     ├── main.py
-    └── requirements.txt
+    ├── requirements.txt
+    └── .env.example
 ```
 
 ## Tech Stack
@@ -31,6 +34,7 @@ agentsmith/
 
 ### Backend
 - **FastAPI** - Modern Python web framework
+- **OpenAI API** - GPT-3.5-turbo for chat responses
 - **Uvicorn** - ASGI server
 - **Pydantic** - Data validation
 
@@ -38,6 +42,7 @@ agentsmith/
 
 - **Node.js** (v16 or higher)
 - **Python** (v3.9 or higher)
+- **OpenAI API Key** - [Get one here](https://platform.openai.com/api-keys)
 - **npm** or **yarn**
 
 ## Setup Instructions
@@ -66,7 +71,17 @@ agentsmith/
    pip install -r requirements.txt
    ```
 
-5. Run the FastAPI server:
+5. Create a `.env` file from the example:
+   ```bash
+   cp .env.example .env
+   ```
+
+6. Edit `.env` and add your OpenAI API key:
+   ```
+   OPENAI_API_KEY=your_actual_api_key_here
+   ```
+
+7. Run the FastAPI server:
    ```bash
    uvicorn main:app --reload
    ```
@@ -95,58 +110,64 @@ agentsmith/
 ## API Endpoints
 
 ### GET `/`
-Returns a welcome message from the API.
+Returns API status.
 
 **Response:**
 ```json
 {
-  "message": "Hello from FastAPI!"
+  "message": "AgentSmith Chatbot API",
+  "status": "online"
 }
 ```
 
-### GET `/items`
-Returns a list of items.
-
-**Response:**
-```json
-[
-  {
-    "id": 1,
-    "name": "Item 1",
-    "description": "First item"
-  },
-  {
-    "id": 2,
-    "name": "Item 2",
-    "description": "Second item"
-  },
-  {
-    "id": 3,
-    "name": "Item 3",
-    "description": "Third item"
-  }
-]
-```
-
-### POST `/items`
-Creates a new item.
+### POST `/chat`
+Send a message to the chatbot.
 
 **Request Body:**
 ```json
 {
-  "name": "New Item",
-  "description": "Item description"
+  "message": "Hello, how are you?",
+  "conversation_history": [
+    {
+      "role": "user",
+      "content": "Previous message",
+      "timestamp": "2025-10-03T10:00:00.000Z"
+    }
+  ]
 }
 ```
 
 **Response:**
 ```json
 {
-  "id": 4,
-  "name": "New Item",
-  "description": "Item description"
+  "message": "I'm doing great, thank you for asking! How can I help you today?",
+  "timestamp": "2025-10-03T10:00:01.000Z"
 }
 ```
+
+### GET `/health`
+Check API health and configuration.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "openai_configured": true
+}
+```
+
+## Features
+
+- ✅ Real-time chat with OpenAI GPT-3.5-turbo
+- ✅ Conversation history context (last 10 messages)
+- ✅ Beautiful dark-themed UI with Tailwind CSS
+- ✅ Message timestamps
+- ✅ Loading indicators
+- ✅ Error handling
+- ✅ Clear chat functionality
+- ✅ Responsive design
+- ✅ TypeScript for type safety
+- ✅ CORS configured for local development
 
 ## Development
 
@@ -171,14 +192,29 @@ FastAPI automatically generates interactive API documentation:
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 
-## Features
+## Environment Variables
 
-- ✅ React with TypeScript for type safety
-- ✅ Tailwind CSS for responsive styling
-- ✅ FastAPI with async/await support
-- ✅ CORS configured for local development
-- ✅ Pydantic models for data validation
-- ✅ Hot reload for both frontend and backend
+### Backend (.env)
+```
+OPENAI_API_KEY=your_openai_api_key_here
+```
+
+## Usage
+
+1. Start both backend and frontend servers
+2. Open `http://localhost:5173` in your browser
+3. Type a message in the input field
+4. Press "Send" or hit Enter
+5. The chatbot will respond using OpenAI's GPT-3.5-turbo
+6. Continue the conversation - the bot maintains context from previous messages
+7. Click "Clear Chat" to start a new conversation
+
+## Troubleshooting
+
+- **401 Error**: Check your OpenAI API key in the `.env` file
+- **429 Error**: You've hit the rate limit, wait a moment and try again
+- **CORS Error**: Ensure backend is running on port 8000 and frontend on 5173
+- **Connection Error**: Make sure both servers are running
 
 ## License
 
