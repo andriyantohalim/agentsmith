@@ -5,7 +5,6 @@ from config import get_settings
 
 router = APIRouter(tags=["health"])
 
-# This will be injected
 document_service: DocumentService = None
 
 def set_document_service(service: DocumentService):
@@ -15,12 +14,11 @@ def set_document_service(service: DocumentService):
 @router.get("/")
 async def root():
     """Root endpoint."""
-    settings = get_settings()
-    return {"message": settings.app_name, "status": "online"}
+    return {"message": get_settings().app_name, "status": "online"}
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
-    """Check API health and configuration."""
+    """Health check."""
     settings = get_settings()
     doc_info = document_service.get_document_info()
     

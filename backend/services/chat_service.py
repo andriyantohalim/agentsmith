@@ -14,69 +14,62 @@ class ChatService:
             base_url=self.settings.openai_api_base
         )
     
-    def build_system_message(self, context: Optional[str] = None) -> dict:
-        """Build the system message for the chat."""
-        base_content = "You are AgentSmith, a helpful AI assistant. Be concise, friendly, and informative."
+    def build_system_prompt(self, context: Optional[str] = None) -> str:
+        """Build the system prompt."""
+        base = "You are AgentSmith, a helpful AI assistant. Be concise, friendly, and informative."
         
-        if context:
-            base_content = f"""You are AgentSmith, a helpful AI assistant.
+        if not context:
+            return base
+        
+        return f"""{base}
 
-IMPORTANT: Answer the user's question ONLY based on the following context from the uploaded documents. If the answer is not in the context, say "I don't find that information in the uploaded documents."
+IMPORTANT: Answer based ONLY on this context from the uploaded documents.
+If the answer isn't in the context, say "I don't find that information in the documents."
 
 Context:
 {context}
 
 Instructions:
-- Use only the information from the context above
+- Use only the context above
 - Be specific and cite relevant parts
-- If unsure, acknowledge it
-- Keep answers concise and direct"""
-        
-        return {"role": "system", "content": base_content}
+- Keep answers concise"""
     
-    def prepare_messages(
+    def get_rag_context(self, query: str) -> tuple[Optional[str], List[str]]:
+        """Get RAG context and sources for a query."""
+        docs = self.document_service.retrieve_relevant_documents(query)
+        
+        if not docs:
+            return None, []
+        
+        context = "\n\n".join(
+            f"[Excerpt {i}]:\n{doc.page_content}"
+            for i, doc in enumerate(docs, 1)
+        )
+        
+        sources = list(set(
+            doc.metadata.get("source", "Unknown") 
+            for doc in docs
+        ))
+        
+        return context, sources
+    
+    def build_messages(
         self,
         user_message: str,
-        conversation_history: List[Message],
+        history: List[Message],
         use_rag: bool
     ) -> tuple[list, List[str]]:
-        """Prepare messages for OpenAI API call."""
-        sources = []
-        context = None
+        """Build messages for OpenAI API."""
+        context, sources = None, []
         
-        # If RAG is enabled, retrieve relevant documents
         if use_rag:
-            relevant_docs = self.document_service.retrieve_relevant_documents(user_message)
-            if relevant_docs:
-                # Build context with more detail
-                context_parts = []
-                for i, doc in enumerate(relevant_docs, 1):
-                    context_parts.append(f"[Excerpt {i}]:\n{doc.page_content}")
-                
-                context = "\n\n".join(context_parts)
-                sources = list(set([
-                    doc.metadata.get("source", "Unknown")
-                    for doc in relevant_docs
-                ]))
-                
-                # Debug logging
-                print(f"\n{'='*50}")
-                print(f"RAG Query: {user_message}")
-                print(f"Found {len(relevant_docs)} relevant documents")
-                print(f"Sources: {sources}")
-                print(f"Context length: {len(context)} characters")
-                print(f"Context preview: {context[:500]}...")
-                print(f"{'='*50}\n")
+            context, sources = self.get_rag_context(user_message)
         
-        # Build messages
-        messages = [self.build_system_message(context)]
-        
-        # Add conversation history (last 10 messages)
-        for msg in conversation_history[-10:]:
-            messages.append({"role": msg.role, "content": msg.content})
-        
-        # Add current user message
-        messages.append({"role": "user", "content": user_message})
+        messages = [
+            {"role": "system", "content": self.build_system_prompt(context)},
+            *[{"role": msg.role, "content": msg.content} for msg in history[-10:]],
+            {"role": "user", "content": user_message}
+        ]
         
         return messages, sources
     
@@ -87,13 +80,8 @@ Instructions:
         use_rag: bool
     ) -> ChatResponse:
         """Generate a chat response."""
-        messages, sources = self.prepare_messages(
-            user_message,
-            conversation_history,
-            use_rag
-        )
+        messages, sources = self.build_messages(user_message, conversation_history, use_rag)
         
-        # Call OpenAI API
         response = self.client.chat.completions.create(
             model=self.settings.model_name,
             messages=messages,
@@ -101,10 +89,8 @@ Instructions:
             temperature=self.settings.temperature
         )
         
-        assistant_message = response.choices[0].message.content
-        
         return ChatResponse(
-            message=assistant_message,
+            message=response.choices[0].message.content,
             timestamp=datetime.now().isoformat(),
             sources=sources if sources else None
         )
