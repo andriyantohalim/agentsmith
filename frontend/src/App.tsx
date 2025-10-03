@@ -1,12 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
-import { Message, ChatResponse } from './types/chat';
+import { Message, ChatResponse, UploadResponse, DocumentInfo } from './types/chat';
 
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [useRAG, setUseRAG] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [documentInfo, setDocumentInfo] = useState<DocumentInfo | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -15,6 +19,81 @@ function App() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    fetchDocumentInfo();
+  }, []);
+
+  const fetchDocumentInfo = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/documents');
+      const data = await response.json();
+      setDocumentInfo(data);
+    } catch (err) {
+      console.error('Error fetching document info:', err);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setError(null);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('http://localhost:8000/upload-pdf', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to upload PDF');
+      }
+
+      const data: UploadResponse = await response.json();
+      
+      // Add system message about uploaded document
+      const systemMessage: Message = {
+        role: 'assistant',
+        content: `📄 Successfully uploaded "${data.filename}"\n\n📊 Processed ${data.pages} pages into ${data.chunks} chunks.\n\n💡 You can now ask questions about this document by enabling RAG mode.`,
+        timestamp: new Date().toISOString()
+      };
+      
+      setMessages(prev => [...prev, systemMessage]);
+      await fetchDocumentInfo();
+      
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload PDF');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const clearDocuments = async () => {
+    try {
+      await fetch('http://localhost:8000/documents', { method: 'DELETE' });
+      setDocumentInfo(null);
+      setUseRAG(false);
+      
+      const systemMessage: Message = {
+        role: 'assistant',
+        content: '🗑️ All documents have been cleared.',
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, systemMessage]);
+    } catch (err) {
+      setError('Failed to clear documents');
+    }
+  };
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +119,8 @@ function App() {
         },
         body: JSON.stringify({
           message: inputMessage,
-          conversation_history: messages
+          conversation_history: messages,
+          use_rag: useRAG
         }),
       });
 
@@ -54,7 +134,8 @@ function App() {
       const assistantMessage: Message = {
         role: 'assistant',
         content: data.message,
-        timestamp: data.timestamp
+        timestamp: data.timestamp,
+        sources: data.sources
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -89,17 +170,74 @@ function App() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white">AgentSmith</h1>
-              <p className="text-sm text-gray-400">AI Assistant</p>
+              <p className="text-sm text-gray-400">AI Assistant with RAG</p>
             </div>
           </div>
-          <button
-            onClick={clearChat}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
-          >
-            Clear Chat
-          </button>
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={clearChat}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+            >
+              Clear Chat
+            </button>
+          </div>
         </div>
       </header>
+
+      {/* RAG Controls */}
+      <div className="bg-gray-800 border-b border-gray-700 p-3">
+        <div className="container mx-auto max-w-4xl flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf"
+              onChange={handleFileUpload}
+              disabled={isUploading}
+              className="hidden"
+              id="pdf-upload"
+            />
+            <label
+              htmlFor="pdf-upload"
+              className={`px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer transition-colors ${
+                isUploading ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              {isUploading ? 'Uploading...' : '📄 Upload PDF'}
+            </label>
+            
+            {documentInfo && documentInfo.documents.length > 0 && (
+              <>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="rag-toggle"
+                    checked={useRAG}
+                    onChange={(e) => setUseRAG(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                  />
+                  <label htmlFor="rag-toggle" className="text-sm text-gray-300">
+                    Use RAG (Ask about documents)
+                  </label>
+                </div>
+                
+                <button
+                  onClick={clearDocuments}
+                  className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition-colors"
+                >
+                  Clear Docs
+                </button>
+              </>
+            )}
+          </div>
+          
+          {documentInfo && documentInfo.documents.length > 0 && (
+            <div className="text-sm text-gray-400">
+              📚 {documentInfo.documents.length} document(s) | {documentInfo.total_chunks} chunks
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Messages Container */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -112,8 +250,11 @@ function App() {
               <h2 className="text-2xl font-semibold text-white mb-2">
                 Welcome to AgentSmith
               </h2>
-              <p className="text-gray-400">
-                Start a conversation by typing a message below
+              <p className="text-gray-400 mb-4">
+                Upload a PDF and ask questions about it using RAG
+              </p>
+              <p className="text-sm text-gray-500">
+                Or start a regular conversation
               </p>
             </div>
           ) : (
@@ -134,6 +275,21 @@ function App() {
                   <p className="whitespace-pre-wrap break-words">
                     {message.content}
                   </p>
+                  {message.sources && message.sources.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-600">
+                      <p className="text-xs text-gray-400 mb-1">Sources:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {message.sources.map((source, idx) => (
+                          <span
+                            key={idx}
+                            className="text-xs bg-gray-600 px-2 py-1 rounded"
+                          >
+                            {source}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <p className={`text-xs mt-2 ${
                     message.role === 'user' ? 'text-blue-200' : 'text-gray-400'
                   }`}>
@@ -175,7 +331,7 @@ function App() {
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              placeholder="Type your message..."
+              placeholder={useRAG ? "Ask a question about your documents..." : "Type your message..."}
               disabled={isLoading}
               className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             />
