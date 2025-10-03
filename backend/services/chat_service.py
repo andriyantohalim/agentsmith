@@ -19,7 +19,18 @@ class ChatService:
         base_content = "You are AgentSmith, a helpful AI assistant. Be concise, friendly, and informative."
         
         if context:
-            base_content += f"\n\nContext from uploaded documents:\n{context}\n\nUse this context to answer the user's question."
+            base_content = f"""You are AgentSmith, a helpful AI assistant.
+
+IMPORTANT: Answer the user's question ONLY based on the following context from the uploaded documents. If the answer is not in the context, say "I don't find that information in the uploaded documents."
+
+Context:
+{context}
+
+Instructions:
+- Use only the information from the context above
+- Be specific and cite relevant parts
+- If unsure, acknowledge it
+- Keep answers concise and direct"""
         
         return {"role": "system", "content": base_content}
     
@@ -37,11 +48,25 @@ class ChatService:
         if use_rag:
             relevant_docs = self.document_service.retrieve_relevant_documents(user_message)
             if relevant_docs:
-                context = "\n\n".join([doc.page_content for doc in relevant_docs])
+                # Build context with more detail
+                context_parts = []
+                for i, doc in enumerate(relevant_docs, 1):
+                    context_parts.append(f"[Excerpt {i}]:\n{doc.page_content}")
+                
+                context = "\n\n".join(context_parts)
                 sources = list(set([
                     doc.metadata.get("source", "Unknown")
                     for doc in relevant_docs
                 ]))
+                
+                # Debug logging
+                print(f"\n{'='*50}")
+                print(f"RAG Query: {user_message}")
+                print(f"Found {len(relevant_docs)} relevant documents")
+                print(f"Sources: {sources}")
+                print(f"Context length: {len(context)} characters")
+                print(f"Context preview: {context[:500]}...")
+                print(f"{'='*50}\n")
         
         # Build messages
         messages = [self.build_system_message(context)]

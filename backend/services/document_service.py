@@ -34,7 +34,8 @@ class DocumentService:
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=self.settings.chunk_size,
             chunk_overlap=self.settings.chunk_overlap,
-            length_function=len
+            length_function=len,
+            separators=["\n\n", "\n", " ", ""]
         )
         
         return text_splitter.split_text(text)
@@ -42,8 +43,11 @@ class DocumentService:
     def create_documents(self, chunks: List[str], filename: str) -> List[Document]:
         """Create Document objects from text chunks."""
         return [
-            Document(page_content=chunk, metadata={"source": filename})
-            for chunk in chunks
+            Document(
+                page_content=chunk.strip(),
+                metadata={"source": filename, "chunk_id": i}
+            )
+            for i, chunk in enumerate(chunks) if chunk.strip()
         ]
     
     def add_documents_to_vector_store(self, documents: List[Document]) -> None:
@@ -92,6 +96,8 @@ class DocumentService:
         
         # Create documents
         documents = self.create_documents(chunks, filename)
+        print(f"Created {len(documents)} document objects (after filtering empty chunks)")
+        
         self.uploaded_documents.extend(documents)
         
         # Add to vector store
@@ -101,15 +107,27 @@ class DocumentService:
         
         return page_count, len(chunks)
     
-    def retrieve_relevant_documents(self, query: str) -> List[Document]:
-        """Retrieve relevant documents for a query."""
+    def retrieve_relevant_documents(self, query: str, k: int = None) -> List[Document]:
+        """Retrieve relevant documents for a query using similarity search."""
         if self.vector_store is None:
+            print("WARNING: No vector store available")
             return []
         
-        retriever = self.vector_store.as_retriever(
-            search_kwargs={"k": self.settings.max_retrieval_docs}
-        )
-        return retriever.get_relevant_documents(query)
+        k = k or self.settings.max_retrieval_docs
+        
+        try:
+            # Use similarity search with scores for better debugging
+            docs_with_scores = self.vector_store.similarity_search_with_score(query, k=k)
+            
+            print(f"\nSimilarity Search Results for: '{query}'")
+            for i, (doc, score) in enumerate(docs_with_scores, 1):
+                print(f"  [{i}] Score: {score:.4f} | Source: {doc.metadata.get('source')} | Preview: {doc.page_content[:100]}...")
+            
+            # Return just the documents
+            return [doc for doc, score in docs_with_scores]
+        except Exception as e:
+            print(f"ERROR in retrieve_relevant_documents: {e}")
+            return []
     
     def get_document_info(self) -> dict:
         """Get information about uploaded documents."""
@@ -127,3 +145,4 @@ class DocumentService:
         """Clear all documents and vector store."""
         self.vector_store = None
         self.uploaded_documents = []
+        print("All documents and vector store cleared")

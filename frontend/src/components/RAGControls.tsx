@@ -8,7 +8,6 @@ interface RAGControlsProps {
   onClearDocuments: () => void;
   documentInfo: DocumentInfo | null;
   isUploading: boolean;
-  uploadProgress: string;
 }
 
 export const RAGControls = ({
@@ -18,7 +17,6 @@ export const RAGControls = ({
   onClearDocuments,
   documentInfo,
   isUploading,
-  uploadProgress,
 }: RAGControlsProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -26,12 +24,11 @@ export const RAGControls = ({
     const file = e.target.files?.[0];
     if (file) {
       onFileUpload(file);
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
+
+  const hasDocuments = documentInfo && documentInfo.documents.length > 0;
 
   return (
     <div className="bg-gray-800 border-b border-gray-700 p-3">
@@ -53,23 +50,20 @@ export const RAGControls = ({
                 isUploading ? 'opacity-50 cursor-not-allowed' : ''
               }`}
             >
-              {isUploading ? '⏳ Processing...' : '📄 Upload PDF'}
+              {isUploading ? '⏳ Uploading...' : '📄 Upload PDF'}
             </label>
 
-            {documentInfo && documentInfo.documents.length > 0 && (
+            {hasDocuments && (
               <>
-                <div className="flex items-center space-x-2">
+                <label className="flex items-center space-x-2 text-sm text-gray-300">
                   <input
                     type="checkbox"
-                    id="rag-toggle"
                     checked={useRAG}
                     onChange={(e) => onToggleRAG(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                    className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded"
                   />
-                  <label htmlFor="rag-toggle" className="text-sm text-gray-300">
-                    {useRAG ? '✅ RAG Enabled' : '⬜ RAG Disabled'}
-                  </label>
-                </div>
+                  <span>{useRAG ? '✅ RAG Enabled' : '⬜ RAG Disabled'}</span>
+                </label>
 
                 <button
                   onClick={onClearDocuments}
@@ -81,36 +75,24 @@ export const RAGControls = ({
             )}
           </div>
 
-          {documentInfo && documentInfo.documents.length > 0 && (
+          {hasDocuments && (
             <div className="text-sm text-gray-400">
-              📚 {documentInfo.total_chunks} chunks loaded
+              📚 {documentInfo.total_chunks} chunks
             </div>
           )}
         </div>
 
-        {/* Upload Progress Indicator */}
-        {uploadProgress && (
-          <div className="mb-3 bg-blue-600/20 border border-blue-500/30 rounded-lg p-3">
-            <div className="flex items-center space-x-3">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-400"></div>
-              <span className="text-blue-300 text-sm font-medium">{uploadProgress}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Uploaded Documents List */}
-        {documentInfo && documentInfo.documents.length > 0 && (
+        {hasDocuments && (
           <div className="bg-gray-700 rounded-lg p-3">
-            <p className="text-xs text-gray-400 mb-2">Uploaded Documents:</p>
+            <p className="text-xs text-gray-400 mb-2">Uploaded:</p>
             <div className="flex flex-wrap gap-2">
               {documentInfo.documents.map((doc, idx) => (
-                <div
+                <span
                   key={idx}
-                  className="bg-blue-600/20 border border-blue-500/30 px-3 py-1 rounded text-sm text-blue-300 flex items-center space-x-2"
+                  className="bg-blue-600/20 border border-blue-500/30 px-3 py-1 rounded text-sm text-blue-300"
                 >
-                  <span>📄</span>
-                  <span>{doc}</span>
-                </div>
+                  📄 {doc}
+                </span>
               ))}
             </div>
           </div>

@@ -5,14 +5,13 @@ import { chatApi } from '../services/api';
 export const useDocuments = () => {
   const [documentInfo, setDocumentInfo] = useState<DocumentInfo | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<string>('');
 
   const fetchDocuments = async () => {
     try {
       const data = await chatApi.getDocuments();
       setDocumentInfo(data);
     } catch (err) {
-      console.error('Error fetching document info:', err);
+      console.error('Error fetching documents:', err);
     }
   };
 
@@ -22,25 +21,10 @@ export const useDocuments = () => {
 
   const uploadPDF = async (file: File) => {
     setIsUploading(true);
-    setUploadProgress('📤 Uploading file...');
-
     try {
-      setUploadProgress('📄 Extracting text from PDF...');
       const data = await chatApi.uploadPDF(file);
-      
-      setUploadProgress('🧠 Creating embeddings...');
       await fetchDocuments();
-      
-      setUploadProgress('✅ Upload complete!');
-      
-      setTimeout(() => {
-        setUploadProgress('');
-      }, 2000);
-
       return data;
-    } catch (err) {
-      setUploadProgress('');
-      throw err;
     } finally {
       setIsUploading(false);
     }
@@ -54,9 +38,7 @@ export const useDocuments = () => {
   return {
     documentInfo,
     isUploading,
-    uploadProgress,
     uploadPDF,
     clearDocuments,
-    refreshDocuments: fetchDocuments,
   };
 };

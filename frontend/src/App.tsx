@@ -9,37 +9,24 @@ import { useDocuments } from './hooks/useDocuments';
 function App() {
   const [useRAG, setUseRAG] = useState(false);
   const { messages, isLoading, error, sendMessage, clearChat, addSystemMessage } = useChat();
-  const {
-    documentInfo,
-    isUploading,
-    uploadProgress,
-    uploadPDF,
-    clearDocuments,
-  } = useDocuments();
+  const { documentInfo, isUploading, uploadPDF, clearDocuments } = useDocuments();
 
   const handleFileUpload = async (file: File) => {
     try {
       const data = await uploadPDF(file);
-      
       addSystemMessage(
-        `📄 Successfully uploaded "${data.filename}"\n\n📊 Processed ${data.pages} pages into ${data.chunks} chunks.\n\n💡 You can now ask questions about this document. RAG mode has been enabled.`
+        `📄 Uploaded "${data.filename}" - ${data.pages} pages, ${data.chunks} chunks.\n💡 RAG mode enabled.`
       );
-      
       setUseRAG(true);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to upload PDF';
-      addSystemMessage(`❌ Upload failed: ${errorMessage}`);
+      addSystemMessage(`❌ Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
   const handleClearDocuments = async () => {
     await clearDocuments();
     setUseRAG(false);
-    addSystemMessage('🗑️ All documents have been cleared.');
-  };
-
-  const handleSendMessage = async (message: string) => {
-    await sendMessage(message, useRAG);
+    addSystemMessage('🗑️ Documents cleared.');
   };
 
   return (
@@ -53,13 +40,12 @@ function App() {
         onClearDocuments={handleClearDocuments}
         documentInfo={documentInfo}
         isUploading={isUploading}
-        uploadProgress={uploadProgress}
       />
 
       <ChatMessages messages={messages} isLoading={isLoading} error={error} />
 
       <ChatInput
-        onSendMessage={handleSendMessage}
+        onSendMessage={(msg) => sendMessage(msg, useRAG)}
         isLoading={isLoading}
         useRAG={useRAG}
       />
