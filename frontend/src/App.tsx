@@ -29,6 +29,7 @@ function App() {
       const response = await fetch('http://localhost:8000/documents');
       const data = await response.json();
       setDocumentInfo(data);
+      console.log('Document info:', data); // Debug log
     } catch (err) {
       console.error('Error fetching document info:', err);
     }
@@ -37,6 +38,8 @@ function App() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    console.log('Uploading file:', file.name); // Debug log
 
     setIsUploading(true);
     setError(null);
@@ -56,6 +59,7 @@ function App() {
       }
 
       const data: UploadResponse = await response.json();
+      console.log('Upload response:', data); // Debug log
       
       // Add system message about uploaded document
       const systemMessage: Message = {
@@ -65,13 +69,19 @@ function App() {
       };
       
       setMessages(prev => [...prev, systemMessage]);
+      
+      // Fetch updated document info
       await fetchDocumentInfo();
+      
+      // Auto-enable RAG mode after upload
+      setUseRAG(true);
       
       // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     } catch (err) {
+      console.error('Upload error:', err); // Debug log
       setError(err instanceof Error ? err.message : 'Failed to upload PDF');
     } finally {
       setIsUploading(false);
@@ -186,54 +196,74 @@ function App() {
 
       {/* RAG Controls */}
       <div className="bg-gray-800 border-b border-gray-700 p-3">
-        <div className="container mx-auto max-w-4xl flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf"
-              onChange={handleFileUpload}
-              disabled={isUploading}
-              className="hidden"
-              id="pdf-upload"
-            />
-            <label
-              htmlFor="pdf-upload"
-              className={`px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer transition-colors ${
-                isUploading ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-            >
-              {isUploading ? 'Uploading...' : '📄 Upload PDF'}
-            </label>
+        <div className="container mx-auto max-w-4xl">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center space-x-4">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf"
+                onChange={handleFileUpload}
+                disabled={isUploading}
+                className="hidden"
+                id="pdf-upload"
+              />
+              <label
+                htmlFor="pdf-upload"
+                className={`px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer transition-colors ${
+                  isUploading ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                {isUploading ? '⏳ Uploading...' : '📄 Upload PDF'}
+              </label>
+              
+              {documentInfo && documentInfo.documents.length > 0 && (
+                <>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="rag-toggle"
+                      checked={useRAG}
+                      onChange={(e) => setUseRAG(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                    />
+                    <label htmlFor="rag-toggle" className="text-sm text-gray-300">
+                      {useRAG ? '✅ RAG Enabled' : '⬜ RAG Disabled'}
+                    </label>
+                  </div>
+                  
+                  <button
+                    onClick={clearDocuments}
+                    className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition-colors"
+                  >
+                    🗑️ Clear Docs
+                  </button>
+                </>
+              )}
+            </div>
             
             {documentInfo && documentInfo.documents.length > 0 && (
-              <>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="rag-toggle"
-                    checked={useRAG}
-                    onChange={(e) => setUseRAG(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
-                  />
-                  <label htmlFor="rag-toggle" className="text-sm text-gray-300">
-                    Use RAG (Ask about documents)
-                  </label>
-                </div>
-                
-                <button
-                  onClick={clearDocuments}
-                  className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition-colors"
-                >
-                  Clear Docs
-                </button>
-              </>
+              <div className="text-sm text-gray-400">
+                📚 {documentInfo.total_chunks} chunks loaded
+              </div>
             )}
           </div>
-          
+
+          {/* Uploaded Documents List */}
           {documentInfo && documentInfo.documents.length > 0 && (
-            <div className="text-sm text-gray-400">
-              📚 {documentInfo.documents.length} document(s) | {documentInfo.total_chunks} chunks
+            <div className="bg-gray-700 rounded-lg p-3">
+              <p className="text-xs text-gray-400 mb-2">Uploaded Documents:</p>
+              <div className="flex flex-wrap gap-2">
+                {documentInfo.documents.map((doc, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-blue-600/20 border border-blue-500/30 px-3 py-1 rounded text-sm text-blue-300 flex items-center space-x-2"
+                  >
+                    <span>📄</span>
+                    <span>{doc}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -277,12 +307,12 @@ function App() {
                   </p>
                   {message.sources && message.sources.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-gray-600">
-                      <p className="text-xs text-gray-400 mb-1">Sources:</p>
+                      <p className="text-xs text-gray-400 mb-1">📚 Sources:</p>
                       <div className="flex flex-wrap gap-2">
                         {message.sources.map((source, idx) => (
                           <span
                             key={idx}
-                            className="text-xs bg-gray-600 px-2 py-1 rounded"
+                            className="text-xs bg-blue-600/30 px-2 py-1 rounded border border-blue-500/30"
                           >
                             {source}
                           </span>
@@ -314,7 +344,7 @@ function App() {
           
           {error && (
             <div className="bg-red-500/20 border border-red-500 rounded-lg p-4 text-red-200">
-              <p className="font-semibold">Error:</p>
+              <p className="font-semibold">❌ Error:</p>
               <p>{error}</p>
             </div>
           )}

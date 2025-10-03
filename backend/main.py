@@ -7,10 +7,10 @@ from datetime import datetime
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain.vectorstores import FAISS
+from langchain_openai import OpenAIEmbeddings
+from langchain_community.vectorstores import FAISS
 from langchain.schema import Document
-import shutil
+import traceback
 
 # Load environment variables from .env file
 load_dotenv()
@@ -66,23 +66,42 @@ async def root():
 async def upload_pdf(file: UploadFile = File(...)):
     global vector_store, uploaded_documents
     
+    temp_file_path = None
+    
     try:
+        print(f"Starting upload for file: {file.filename}")
+        
         # Validate file type
         if not file.filename.endswith('.pdf'):
             raise HTTPException(status_code=400, detail="Only PDF files are allowed")
         
         # Save uploaded file temporarily
         temp_file_path = f"temp_{file.filename}"
+        print(f"Saving to: {temp_file_path}")
+        
         with open(temp_file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            content = await file.read()
+            buffer.write(content)
+        
+        print(f"File saved, size: {len(content)} bytes")
         
         # Extract text from PDF
+        print("Extracting text from PDF...")
         pdf_reader = PdfReader(temp_file_path)
         text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text()
+        for i, page in enumerate(pdf_reader.pages):
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
+            print(f"Processed page {i+1}/{len(pdf_reader.pages)}")
+        
+        if not text.strip():
+            raise HTTPException(status_code=400, detail="No text content found in PDF")
+        
+        print(f"Extracted {len(text)} characters of text")
         
         # Split text into chunks
+        print("Splitting text into chunks...")
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200,
@@ -90,36 +109,53 @@ async def upload_pdf(file: UploadFile = File(...)):
         )
         
         chunks = text_splitter.split_text(text)
+        print(f"Created {len(chunks)} chunks")
         
         # Create documents
         documents = [Document(page_content=chunk, metadata={"source": file.filename}) for chunk in chunks]
         uploaded_documents.extend(documents)
         
+        print("Creating embeddings...")
         # Create or update vector store
         embeddings = OpenAIEmbeddings(
-            openai_api_key=os.getenv("OPENAI_API_KEY"),
-            openai_api_base=os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
+            api_key=os.getenv("OPENAI_API_KEY")
         )
         
         if vector_store is None:
+            print("Creating new vector store...")
             vector_store = FAISS.from_documents(documents, embeddings)
         else:
+            print("Adding to existing vector store...")
             vector_store.add_documents(documents)
         
-        # Clean up temp file
-        os.remove(temp_file_path)
+        print("Vector store updated successfully")
         
-        return UploadResponse(
+        # Clean up temp file
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+            print(f"Cleaned up temp file: {temp_file_path}")
+        
+        response = UploadResponse(
             filename=file.filename,
             pages=len(pdf_reader.pages),
             chunks=len(chunks),
             message=f"Successfully processed {file.filename}"
         )
+        
+        print(f"Upload complete: {response}")
+        return response
     
+    except HTTPException:
+        raise
     except Exception as e:
+        # Print full stack trace
+        print(f"ERROR in upload_pdf: {str(e)}")
+        print(traceback.format_exc())
+        
         # Clean up temp file if it exists
-        if os.path.exists(temp_file_path):
+        if temp_file_path and os.path.exists(temp_file_path):
             os.remove(temp_file_path)
+        
         raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
 
 @app.post("/chat", response_model=ChatResponse)
@@ -172,6 +208,7 @@ async def chat(request: ChatRequest):
     
     except Exception as e:
         error_msg = str(e)
+        print(f"ERROR in chat: {error_msg}")
         if "authentication" in error_msg.lower():
             raise HTTPException(status_code=401, detail="Invalid OpenAI API key")
         elif "rate" in error_msg.lower():
