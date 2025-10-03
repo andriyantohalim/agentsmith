@@ -8,6 +8,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [useRAG, setUseRAG] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string>('');
   const [documentInfo, setDocumentInfo] = useState<DocumentInfo | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -29,7 +30,7 @@ function App() {
       const response = await fetch('http://localhost:8000/documents');
       const data = await response.json();
       setDocumentInfo(data);
-      console.log('Document info:', data); // Debug log
+      console.log('Document info:', data);
     } catch (err) {
       console.error('Error fetching document info:', err);
     }
@@ -39,15 +40,18 @@ function App() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    console.log('Uploading file:', file.name); // Debug log
+    console.log('Uploading file:', file.name);
 
     setIsUploading(true);
+    setUploadProgress('📤 Uploading file...');
     setError(null);
 
     const formData = new FormData();
     formData.append('file', file);
 
     try {
+      setUploadProgress('📄 Extracting text from PDF...');
+      
       const response = await fetch('http://localhost:8000/upload-pdf', {
         method: 'POST',
         body: formData,
@@ -58,13 +62,17 @@ function App() {
         throw new Error(errorData.detail || 'Failed to upload PDF');
       }
 
+      setUploadProgress('🧠 Creating embeddings...');
+
       const data: UploadResponse = await response.json();
-      console.log('Upload response:', data); // Debug log
+      console.log('Upload response:', data);
+      
+      setUploadProgress('✅ Upload complete!');
       
       // Add system message about uploaded document
       const systemMessage: Message = {
         role: 'assistant',
-        content: `📄 Successfully uploaded "${data.filename}"\n\n📊 Processed ${data.pages} pages into ${data.chunks} chunks.\n\n💡 You can now ask questions about this document by enabling RAG mode.`,
+        content: `📄 Successfully uploaded "${data.filename}"\n\n📊 Processed ${data.pages} pages into ${data.chunks} chunks.\n\n💡 You can now ask questions about this document. RAG mode has been enabled.`,
         timestamp: new Date().toISOString()
       };
       
@@ -80,9 +88,16 @@ function App() {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+
+      // Clear progress after 2 seconds
+      setTimeout(() => {
+        setUploadProgress('');
+      }, 2000);
+      
     } catch (err) {
-      console.error('Upload error:', err); // Debug log
+      console.error('Upload error:', err);
       setError(err instanceof Error ? err.message : 'Failed to upload PDF');
+      setUploadProgress('');
     } finally {
       setIsUploading(false);
     }
@@ -214,7 +229,7 @@ function App() {
                   isUploading ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
-                {isUploading ? '⏳ Uploading...' : '📄 Upload PDF'}
+                {isUploading ? '⏳ Processing...' : '📄 Upload PDF'}
               </label>
               
               {documentInfo && documentInfo.documents.length > 0 && (
@@ -248,6 +263,16 @@ function App() {
               </div>
             )}
           </div>
+
+          {/* Upload Progress Indicator */}
+          {uploadProgress && (
+            <div className="mb-3 bg-blue-600/20 border border-blue-500/30 rounded-lg p-3">
+              <div className="flex items-center space-x-3">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-400"></div>
+                <span className="text-blue-300 text-sm font-medium">{uploadProgress}</span>
+              </div>
+            </div>
+          )}
 
           {/* Uploaded Documents List */}
           {documentInfo && documentInfo.documents.length > 0 && (
