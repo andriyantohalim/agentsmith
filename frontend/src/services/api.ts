@@ -24,7 +24,7 @@ export const chatApi = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch(`${API_BASE_URL}/upload-pdf`, {
+    const response = await fetch(`${API_BASE_URL}/documents/upload`, {
       method: 'POST',
       body: formData,
     });
