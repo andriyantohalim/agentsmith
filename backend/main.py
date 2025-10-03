@@ -21,8 +21,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize OpenAI client
+# Initialize OpenAI client with explicit API base URL
 openai.api_key = os.getenv("OPENAI_API_KEY")
+openai.api_base = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
 
 class Message(BaseModel):
     role: str
@@ -82,5 +83,6 @@ async def chat(request: ChatRequest):
 async def health_check():
     return {
         "status": "healthy",
-        "openai_configured": bool(os.getenv("OPENAI_API_KEY"))
+        "openai_configured": bool(os.getenv("OPENAI_API_KEY")),
+        "api_base": openai.api_base
     }
