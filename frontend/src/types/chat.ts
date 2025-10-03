@@ -11,6 +11,12 @@ export interface ChatResponse {
   sources?: string[];
 }
 
+export interface ChatRequest {
+  message: string;
+  conversation_history: Message[];
+  use_rag?: boolean;
+}
+
 export interface UploadResponse {
   filename: string;
   pages: number;
