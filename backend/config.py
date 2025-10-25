@@ -13,16 +13,25 @@ class Settings(BaseSettings):
     chunk_size: int = 1000
     chunk_overlap: int = 200
     batch_size: int = 100
-    max_retrieval_docs: int = 5  # Increased from 3 to 5
+    max_retrieval_docs: int = 5
     
     # Model settings
-    model_name: str = "gpt-3.5-turbo"
-    max_tokens: int = 1000  # Increased from 500 to allow longer answers
+    model_name: str = "gpt-3.5-turbo"  # For Ollama: llama3.2, mistral, etc.
+    max_tokens: int = 1000
     temperature: float = 0.7
+    
+    # Ollama-specific settings
+    use_ollama: bool = False
+    ollama_base_url: str = "http://localhost:11434"
     
     class Config:
         env_file = ".env"
         case_sensitive = False
+    
+    @property
+    def is_ollama(self) -> bool:
+        """Check if using Ollama based on base URL or explicit flag."""
+        return self.use_ollama or "11434" in self.openai_api_base
 
 @lru_cache()
 def get_settings():

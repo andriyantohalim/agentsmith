@@ -2,9 +2,9 @@ from typing import List, Optional
 from langchain.schema import Document
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
+from langchain_community.embeddings import OllamaEmbeddings
 from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-import os
 from config import get_settings
 
 class DocumentService:
@@ -12,7 +12,19 @@ class DocumentService:
         self.settings = get_settings()
         self.vector_store: Optional[FAISS] = None
         self.uploaded_documents: List[Document] = []
-        self.embeddings = OpenAIEmbeddings(api_key=self.settings.openai_api_key)
+        
+        # Use Ollama embeddings or OpenAI embeddings
+        if self.settings.is_ollama:
+            self.embeddings = OllamaEmbeddings(
+                base_url=self.settings.ollama_base_url,
+                model=self.settings.model_name
+            )
+            print(f"🦙 Using Ollama embeddings with {self.settings.model_name}")
+        else:
+            self.embeddings = OpenAIEmbeddings(
+                api_key=self.settings.openai_api_key
+            )
+            print(f"🤖 Using OpenAI embeddings")
     
     def extract_text_from_pdf(self, file_path: str) -> tuple[str, int]:
         """Extract text from PDF file."""

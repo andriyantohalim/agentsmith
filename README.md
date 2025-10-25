@@ -108,6 +108,56 @@ MODEL_NAME = "gpt-3.5-turbo"
 | CORS Error | Ensure backend runs on :8000, frontend on :5173 |
 | Token limit | System auto-batches large PDFs in 100-chunk batches |
 
+## 🦙 Using Ollama (Local LLM)
+
+Instead of OpenAI, you can use Ollama for local inference:
+
+### Setup Ollama
+
+1. **Install Ollama**: Visit [ollama.ai](https://ollama.ai) and download
+
+2. **Pull a model**:
+   ```bash
+   ollama pull llama3.2
+   # or
+   ollama pull mistral
+   # or
+   ollama pull llama2
+   ```
+
+3. **Start Ollama**:
+   ```bash
+   ollama serve
+   ```
+
+4. **Configure backend** - Edit `.env`:
+   ```env
+   USE_OLLAMA=true
+   OLLAMA_BASE_URL=http://localhost:11434
+   MODEL_NAME=llama3.2
+   OPENAI_API_KEY=ollama
+   ```
+
+5. **Restart backend**:
+   ```bash
+   uvicorn main:app --reload
+   ```
+
+### Recommended Models
+
+- `llama3.2` - Meta's latest (8B params) - Fast & good quality
+- `mistral` - Mistral 7B - Excellent for general use
+- `llama2` - Meta's Llama 2 - Stable & reliable
+- `codellama` - Code-focused
+
+### Performance Note
+
+Ollama runs locally, so:
+- ✅ Free (no API costs)
+- ✅ Private (data stays local)
+- ⚠️ Slower than cloud APIs
+- ⚠️ Requires GPU for best performance (CPU works but slower)
+
 ## 📝 License
 
 MIT

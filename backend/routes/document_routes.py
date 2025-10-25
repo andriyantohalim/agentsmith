@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from models.schemas import UploadResponse, DocumentInfo
+from models.schemas import UploadResponse, DocumentInfo, HealthResponse
 from services.document_service import DocumentService
+from config import get_settings
 import os
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -53,3 +54,28 @@ async def clear_documents():
     """Clear all documents."""
     document_service.clear_all_documents()
     return {"message": "Documents cleared"}
+
+@router.get("/info")
+async def root():
+    """Root endpoint."""
+    settings = get_settings()
+    provider = "Ollama" if settings.is_ollama else "OpenAI"
+    return {
+        "message": settings.app_name,
+        "status": "online",
+        "provider": provider,
+        "model": settings.model_name
+    }
+
+@router.get("/health", response_model=HealthResponse)
+async def health_check():
+    """Health check."""
+    settings = get_settings()
+    doc_info = document_service.get_document_info()
+    
+    return HealthResponse(
+        status="healthy",
+        openai_configured=bool(settings.openai_api_key) or settings.is_ollama,
+        api_base=settings.ollama_base_url if settings.is_ollama else settings.openai_api_base,
+        documents_loaded=doc_info["total_chunks"]
+    )

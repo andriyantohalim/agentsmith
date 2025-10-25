@@ -9,10 +9,22 @@ class ChatService:
     def __init__(self, document_service: DocumentService):
         self.settings = get_settings()
         self.document_service = document_service
-        self.client = OpenAI(
-            api_key=self.settings.openai_api_key,
-            base_url=self.settings.openai_api_base
-        )
+        
+        # Configure client based on provider
+        if self.settings.is_ollama:
+            self.client = OpenAI(
+                api_key="ollama",  # Ollama doesn't require a real API key
+                base_url=f"{self.settings.ollama_base_url}/v1"
+            )
+            print(f"🦙 Using Ollama at {self.settings.ollama_base_url}")
+            print(f"📦 Model: {self.settings.model_name}")
+        else:
+            self.client = OpenAI(
+                api_key=self.settings.openai_api_key,
+                base_url=self.settings.openai_api_base
+            )
+            print(f"🤖 Using OpenAI API")
+            print(f"📦 Model: {self.settings.model_name}")
     
     def build_system_prompt(self, context: Optional[str] = None) -> str:
         """Build the system prompt."""
@@ -59,7 +71,7 @@ Instructions:
         history: List[Message],
         use_rag: bool
     ) -> tuple[list, List[str]]:
-        """Build messages for OpenAI API."""
+        """Build messages for OpenAI/Ollama API."""
         context, sources = None, []
         
         if use_rag:
@@ -82,15 +94,31 @@ Instructions:
         """Generate a chat response."""
         messages, sources = self.build_messages(user_message, conversation_history, use_rag)
         
-        response = self.client.chat.completions.create(
-            model=self.settings.model_name,
-            messages=messages,
-            max_tokens=self.settings.max_tokens,
-            temperature=self.settings.temperature
-        )
-        
-        return ChatResponse(
-            message=response.choices[0].message.content,
-            timestamp=datetime.now().isoformat(),
-            sources=sources if sources else None
-        )
+        try:
+            response = self.client.chat.completions.create(
+                model=self.settings.model_name,
+                messages=messages,
+                max_tokens=self.settings.max_tokens,
+                temperature=self.settings.temperature
+            )
+            
+            return ChatResponse(
+                message=response.choices[0].message.content,
+                timestamp=datetime.now().isoformat(),
+                sources=sources if sources else None
+            )
+        except Exception as e:
+            error_msg = str(e)
+            print(f"❌ Error generating response: {error_msg}")
+            
+            # Provide helpful error messages
+            if self.settings.is_ollama and "connect" in error_msg.lower():
+                raise Exception(
+                    "Cannot connect to Ollama. Make sure Ollama is running: 'ollama serve'"
+                )
+            elif self.settings.is_ollama and "model" in error_msg.lower():
+                raise Exception(
+                    f"Model '{self.settings.model_name}' not found. Pull it first: 'ollama pull {self.settings.model_name}'"
+                )
+            else:
+                raise e
