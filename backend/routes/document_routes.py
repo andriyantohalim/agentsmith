@@ -55,7 +55,7 @@ async def clear_documents():
     document_service.clear_all_documents()
     return {"message": "Documents cleared"}
 
-@router.get("/")
+@router.get("/info")
 async def root():
     """Root endpoint."""
     settings = get_settings()
